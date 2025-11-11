@@ -75,6 +75,7 @@ const App: React.FC = () => {
     const [devOptionsUnlocked, setDevOptionsUnlocked] = useState(false);
     const [teleporterEnabled, setTeleporterEnabled] = useState(false);
     const [versionClickCount, setVersionClickCount] = useState(0);
+    const [isTeleporting, setIsTeleporting] = useState(false);
 
     const keysPressed = useRef<{ [key: string]: boolean }>({});
     const gameLoopRef = useRef<number | null>(null);
@@ -329,11 +330,21 @@ const App: React.FC = () => {
             return;
         }
 
-        const performTeleportToTarget = (target: GameObject) => {
+        const findSafeLandingSpot = (target: GameObject): {x: number, y: number} | null => {
             const checkCollision = (x: number, y: number) => {
+                const playerLeft = x;
+                const playerRight = x + PLAYER_WIDTH;
+                const playerTop = y;
+                const playerBottom = y + PLAYER_HEIGHT;
+
                 for (const obj of gameObjects) {
                     if (obj.type === 'obstacle' || obj.type === 'building') {
-                        if (x < obj.x + obj.width && x + PLAYER_WIDTH > obj.x && y < obj.y + obj.height && y + PLAYER_HEIGHT > obj.y) {
+                        const objLeft = obj.x;
+                        const objRight = obj.x + obj.width;
+                        const objTop = obj.y;
+                        const objBottom = obj.y + obj.height;
+
+                        if (playerLeft < objRight && playerRight > objLeft && playerTop < objBottom && playerBottom > objTop) {
                             return true;
                         }
                     }
@@ -341,26 +352,41 @@ const App: React.FC = () => {
                 return false;
             };
 
-            const landingSpots = [
-                { x: target.x + target.width / 2 - PLAYER_WIDTH / 2, y: target.y + target.height + 15 },
-                { x: target.x + target.width / 2 - PLAYER_WIDTH / 2, y: target.y - PLAYER_HEIGHT - 15 },
-                { x: target.x + target.width + 15, y: target.y + target.height / 2 - PLAYER_HEIGHT / 2 },
-                { x: target.x - PLAYER_WIDTH - 15, y: target.y + target.height / 2 - PLAYER_HEIGHT / 2 }
-            ];
+            const centerX = target.x + target.width / 2;
+            const centerY = target.y + target.height / 2;
+            let radius = Math.max(target.width, target.height) / 2 + PLAYER_WIDTH;
+            const maxRadius = radius + 200;
+            const angleStep = Math.PI / 12;
 
-            for (const spot of landingSpots) {
-                const clampedX = Math.max(0, Math.min(spot.x, WORLD_WIDTH - PLAYER_WIDTH));
-                const clampedY = Math.max(0, Math.min(spot.y, WORLD_HEIGHT - PLAYER_HEIGHT));
-                if (!checkCollision(clampedX, clampedY)) {
-                    setPlayerState(prev => ({ ...prev, x: clampedX, y: clampedY }));
-                    return true;
+            while (radius < maxRadius) {
+                for (let angle = 0; angle < 2 * Math.PI; angle += angleStep) {
+                    const potentialX = centerX + Math.cos(angle) * radius - PLAYER_WIDTH / 2;
+                    const potentialY = centerY + Math.sin(angle) * radius - PLAYER_HEIGHT / 2;
+                    
+                    const clampedX = Math.max(0, Math.min(potentialX, WORLD_WIDTH - PLAYER_WIDTH));
+                    const clampedY = Math.max(0, Math.min(potentialY, WORLD_HEIGHT - PLAYER_HEIGHT));
+
+                    if (!checkCollision(clampedX, clampedY)) {
+                        return { x: clampedX, y: clampedY };
+                    }
                 }
+                radius += 20;
             }
-            return false;
+
+            return null;
         };
 
-        if (performTeleportToTarget(targetObject)) {
-            showNotification(`Teletransportado a ${targetObject.name || 'objetivo'} (${missionPurpose}).`);
+        const safeSpot = findSafeLandingSpot(targetObject);
+
+        if (safeSpot) {
+            setIsTeleporting(true);
+            setTimeout(() => {
+                setPlayerState(prev => ({ ...prev, x: safeSpot.x, y: safeSpot.y }));
+                showNotification(`Teletransportado a ${targetObject.name || 'objetivo'} (${missionPurpose}).`);
+            }, 500); // Teleport mid-animation
+            setTimeout(() => {
+                setIsTeleporting(false);
+            }, 1000); // Animation ends
         } else {
             showNotification("No se pudo encontrar un punto de aterrizaje seguro cerca del objetivo.");
         }
@@ -498,6 +524,7 @@ const App: React.FC = () => {
 
     return (
         <div className="app-container">
+            {isTeleporting && <div className="teleport-overlay"></div>}
             <div className="game-viewport" style={{ width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT }}>
                 <div className="game-world" style={{ 
                     width: WORLD_WIDTH, 
