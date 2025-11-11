@@ -12,7 +12,8 @@ import {
   PLAYER_HEIGHT,
   INITIAL_XP_TO_LEVEL_UP,
   VIEWPORT_WIDTH,
-  VIEWPORT_HEIGHT
+  VIEWPORT_HEIGHT,
+  GAME_VERSION
 } from './constants';
 import { generateNpcDialogue } from './services/geminiService';
 import { CoinIcon, GemIcon, XPIcon, InteractIcon, SettingsIcon, CheckIcon, LockIcon } from './components/Icons';
@@ -69,16 +70,17 @@ const App: React.FC = () => {
     const [showHud, setShowHud] = useState(true);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatMission, setChatMission] = useState<Mission | null>(null);
-    const [isDevMode, setIsDevMode] = useState(false);
-    const [titleClickCount, setTitleClickCount] = useState(0);
-    const [isTitleClicked, setIsTitleClicked] = useState(false);
-
+    
+    // Developer Mode State
+    const [devOptionsUnlocked, setDevOptionsUnlocked] = useState(false);
+    const [teleporterEnabled, setTeleporterEnabled] = useState(false);
+    const [versionClickCount, setVersionClickCount] = useState(0);
 
     const keysPressed = useRef<{ [key: string]: boolean }>({});
     const gameLoopRef = useRef<number | null>(null);
     const lastTimeRef = useRef<number>(performance.now());
     const notificationTimeoutRef = useRef<number | null>(null);
-    const titleClickTimeoutRef = useRef<number | null>(null);
+    const versionClickTimeoutRef = useRef<number | null>(null);
 
 
     const isGamePaused = dialogue || isShopOpen || isInventoryOpen || isMenuOpen || isChatOpen;
@@ -87,6 +89,20 @@ const App: React.FC = () => {
     
     const gameObjectsRef = useRef(gameObjects);
     gameObjectsRef.current = gameObjects;
+    
+    // Load dev settings from localStorage on initial load
+    useEffect(() => {
+        try {
+            const unlocked = localStorage.getItem('devOptionsUnlocked') === 'true';
+            const teleporter = localStorage.getItem('teleporterEnabled') === 'true';
+            setDevOptionsUnlocked(unlocked);
+            if (unlocked) {
+                setTeleporterEnabled(teleporter);
+            }
+        } catch (error) {
+            console.warn("Could not read developer settings from localStorage", error);
+        }
+    }, []);
 
     const showNotification = useCallback((message: string, duration: number = 3000) => {
         setNotification(message);
@@ -194,7 +210,7 @@ const App: React.FC = () => {
         if (currentStep.tipo === 'interactuar' && currentStep.objetoId === target.id) {
             if (target.type === 'npc') {
                 setDialogue({ npcName: target.name!, text: "Generando diálogo...", missionContent: activeMission.contenido_educativo });
-                const generatedText = await generateNpcDialogue(target.name!, activeMission.contenido_educativo);
+                const generatedText = await generateNpcDialogue(target.name!, activeMission);
                 setDialogue({ npcName: target.name!, text: generatedText, missionContent: activeMission.contenido_educativo });
             }
             actionTaken = true;
@@ -256,33 +272,33 @@ const App: React.FC = () => {
         }
     };
     
-    const handleTitleClick = () => {
-        if (playerState.upgrades.includes('teleporter_module') && !isGamePaused) {
-            // Visual feedback
-            setIsTitleClicked(true);
-            setTimeout(() => setIsTitleClicked(false), 150);
-    
-            // Reset timer
-            if (titleClickTimeoutRef.current) {
-                clearTimeout(titleClickTimeoutRef.current);
-            }
-    
-            const newCount = titleClickCount + 1;
-            setTitleClickCount(newCount);
-    
-            if (newCount >= 7) {
-                if (!isDevMode) {
-                    setIsDevMode(true);
-                    showNotification("Modo desarrollador: Teletransporte activado (Tecla 'T')");
-                }
-                setTitleClickCount(0); // Reset on success
-            } else {
-                // Set a new timer to reset the count
-                titleClickTimeoutRef.current = window.setTimeout(() => {
-                    setTitleClickCount(0);
-                }, 2000); // 2 seconds to make the next click
-            }
+    const handleVersionClick = () => {
+        if (versionClickTimeoutRef.current) {
+            clearTimeout(versionClickTimeoutRef.current);
         }
+    
+        const newCount = versionClickCount + 1;
+        setVersionClickCount(newCount);
+    
+        if (newCount >= 7) {
+            if (!devOptionsUnlocked) {
+                setDevOptionsUnlocked(true);
+                localStorage.setItem('devOptionsUnlocked', 'true');
+                showNotification("¡Opciones de desarrollador desbloqueadas!");
+            }
+            setVersionClickCount(0); // Reset on success
+        } else {
+            versionClickTimeoutRef.current = window.setTimeout(() => {
+                setVersionClickCount(0);
+            }, 1500); // 1.5 seconds to make the next click
+        }
+    };
+
+    const handleTeleporterToggle = () => {
+        const newSetting = !teleporterEnabled;
+        setTeleporterEnabled(newSetting);
+        localStorage.setItem('teleporterEnabled', String(newSetting));
+        showNotification(`Teletransporte ${newSetting ? 'activado' : 'desactivado'}.`);
     };
 
     const handleTeleport = useCallback(() => {
@@ -428,7 +444,7 @@ const App: React.FC = () => {
                 e.preventDefault();
                 handleInteraction();
             } else if (e.key.toLowerCase() === 't') {
-                if (isDevMode) {
+                if (teleporterEnabled) {
                     e.preventDefault();
                     handleTeleport();
                 }
@@ -457,9 +473,9 @@ const App: React.FC = () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
             if(notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
-            if(titleClickTimeoutRef.current) clearTimeout(titleClickTimeoutRef.current);
+            if(versionClickTimeoutRef.current) clearTimeout(versionClickTimeoutRef.current);
         };
-    }, [handleInteraction, dialogue, isShopOpen, isInventoryOpen, isMenuOpen, isChatOpen, isDevMode, handleTeleport]);
+    }, [handleInteraction, dialogue, isShopOpen, isInventoryOpen, isMenuOpen, isChatOpen, teleporterEnabled, handleTeleport]);
     
     const activeMission = missions.find(m => m.status === 'disponible');
     const xpToLevelUp = INITIAL_XP_TO_LEVEL_UP * Math.pow(1.5, playerState.level - 1);
@@ -536,11 +552,7 @@ const App: React.FC = () => {
             </div>
             
              <div className="top-bar">
-                <div 
-                    className={`game-title ${playerState.upgrades.includes('teleporter_module') ? 'activatable' : ''} ${isTitleClicked ? 'clicked' : ''}`}
-                    onClick={handleTitleClick} 
-                    style={{cursor: playerState.upgrades.includes('teleporter_module') ? 'pointer' : 'default'}}
-                >
+                <div className="game-title">
                     Wisrovi's Interactive CV
                 </div>
                 <div className="top-bar-right">
@@ -647,7 +659,22 @@ const App: React.FC = () => {
                                 <div className="menu-options">
                                     <button onClick={() => setMenuView('missions')}>Lista de Misiones</button>
                                 </div>
+
+                                {devOptionsUnlocked && (
+                                    <div className="dev-options">
+                                        <h4>Opciones de Desarrollador</h4>
+                                        <div className="toggle-switch">
+                                            <label>
+                                                <span>Activar Teletransporte (T)</span>
+                                                <input type="checkbox" checked={teleporterEnabled} onChange={handleTeleporterToggle} />
+                                                <span className="slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <button onClick={() => { setIsMenuOpen(false); setMenuView('main'); }} style={{marginTop: '20px'}}>Cerrar</button>
+                                <p className="game-version" onClick={handleVersionClick}>v{GAME_VERSION}</p>
                             </>
                         )}
                         {menuView === 'missions' && (

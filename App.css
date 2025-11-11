@@ -290,20 +290,6 @@ body {
 .game-title { 
     font-size: 1.2em; 
     font-weight: bold;
-    transition: transform 0.2s ease-in-out, text-shadow 0.3s, color 0.3s;
-}
-.game-title.clicked {
-    transform: scale(1.05);
-    transition: transform 0.1s ease-in-out;
-}
-@keyframes title-glow {
-  0% { text-shadow: 0 0 4px rgba(0, 255, 170, 0.5); }
-  50% { text-shadow: 0 0 12px rgba(0, 255, 170, 1); }
-  100% { text-shadow: 0 0 4px rgba(0, 255, 170, 0.5); }
-}
-.game-title.activatable {
-  animation: title-glow 2.5s infinite ease-in-out;
-  color: var(--xp-color);
 }
 .top-bar-right { display: flex; align-items: center; gap: 20px; }
 .player-stats-top { display: flex; align-items: center; gap: 15px; }
@@ -386,9 +372,14 @@ body {
 .dialogue-box h3 { margin-top: 0; color: var(--xp-color); }
 .dialogue-box p { line-height: 1.6; }
 .dialogue-box small { display: block; margin-top: 15px; opacity: 0.7; }
-.modal-box { background: var(--ui-bg); border: 2px solid var(--ui-border); padding: 25px; border-radius: 10px; width: 90%; max-width: 500px; box-shadow: 0 0 20px var(--ui-border); max-height: 80vh; display: flex; flex-direction: column; }
+.modal-box { background: var(--ui-bg); border: 2px solid var(--ui-border); padding: 25px; border-radius: 10px; width: 90%; max-width: 500px; box-shadow: 0 0 20px var(--ui-border); max-height: 80vh; display: flex; flex-direction: column; position: relative;}
 .modal-box.wide { max-width: 700px; }
-.modal-box h3 { text-align: center; margin-top: 0; border-bottom: 1px solid var(--ui-border); padding-bottom: 10px; }
+.modal-box h3 { 
+  text-align: center; 
+  margin-top: 0; 
+  border-bottom: 1px solid var(--ui-border); 
+  padding-bottom: 10px;
+}
 .modal-box button { background-color: var(--player-color-1); border: none; color: white; padding: 10px 15px; cursor: pointer; border-radius: 5px; transition: background-color 0.3s; }
 .modal-box button:hover { background-color: var(--player-color-2); }
 .modal-box button:disabled { background-color: #555; cursor: not-allowed; }
@@ -436,3 +427,67 @@ body {
 .sources-container ul { margin: 5px 0 0; padding-left: 20px; }
 .sources-container li a { color: #99ccff; text-decoration: none; }
 .sources-container li a:hover { text-decoration: underline; }
+
+/* Developer Options */
+.game-version {
+    position: absolute;
+    bottom: 10px;
+    right: 15px;
+    font-size: 0.7em;
+    color: #666;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.3s;
+}
+.game-version:hover {
+    color: #999;
+}
+.dev-options {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid var(--ui-border);
+}
+.dev-options h4 {
+    text-align: center;
+    color: var(--xp-color);
+    margin-bottom: 15px;
+}
+.toggle-switch {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.toggle-switch label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+.toggle-switch .slider {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background-color: #555;
+    border-radius: 12px;
+    transition: background-color 0.3s;
+}
+.toggle-switch .slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s;
+}
+.toggle-switch input {
+    display: none;
+}
+.toggle-switch input:checked + .slider {
+    background-color: var(--xp-color);
+}
+.toggle-switch input:checked + .slider::before {
+    transform: translateX(20px);
+}

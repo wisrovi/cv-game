@@ -12,6 +12,7 @@ export const VIEWPORT_HEIGHT = 800;
 
 
 export const INITIAL_XP_TO_LEVEL_UP = 100;
+export const GAME_VERSION = '1.1.0';
 
 export const gameObjects: GameObject[] = [
   // NPCs
@@ -229,5 +230,4 @@ export const shopItems: ShopItem[] = [
     { id: 'speed_boost_1', name: 'Aumento de Velocidad', description: 'Aumenta tu velocidad de movimiento en un 33%.', cost: 100, effect: { type: 'SPEED_BOOST', value: 1.33 } },
     { id: 'interaction_range_1', name: 'Escáner de Largo Alcance', description: 'Aumenta tu rango de interacción un 50%.', cost: 120, effect: { type: 'INTERACTION_RANGE_BOOST', value: 1.5 } },
     { id: 'xp_boost_1', name: 'Módulo de Aprendizaje', description: 'Gana un 20% más de XP permanentemente.', cost: 200, effect: { type: 'XP_BOOST', value: 1.2 } },
-    { id: 'teleporter_module', name: 'Módulo de Teletransporte', description: 'Un módulo misterioso con potencial oculto.', cost: 500, effect: { type: 'TELEPORTER', value: 1 } },
 ];

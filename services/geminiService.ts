@@ -3,9 +3,35 @@ import { Mission, ChatMessage } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export async function generateNpcDialogue(npcName: string, missionContent: string): Promise<string> {
+const npcPersonas: { [key: string]: string } = {
+    'Ada, la Guía': 'Eres Ada, la Guía principal del jugador. Eres amable, alentadora y te enfocas en el panorama general. Tu objetivo es hacer que el jugador se sienta bienvenido y curioso.',
+    'Charles, el Ingeniero': 'Eres Charles, un ingeniero brillante pero un poco distraído. Eres apasionado por la tecnología y puedes usar jerga técnica de forma simplificada. Eres directo y te enfocas en la tarea en cuestión.',
+    'Vendedor de Mejoras': 'Eres el Vendedor de Mejoras. Eres enérgico, persuasivo y siempre estás buscando una oportunidad para hablar de tus increíbles productos, aunque sea sutilmente. Tu tono es amigable y comercial.',
+    'default': 'Eres un personaje amistoso en un videojuego interactivo que es un CV. Tu propósito es guiar al jugador.'
+};
+
+
+export async function generateNpcDialogue(npcName: string, mission: Mission): Promise<string> {
   try {
-    const prompt = `Eres un personaje amistoso llamado ${npcName} en un videojuego interactivo que es un CV. Tu propósito es guiar al jugador. Explica el siguiente concepto de una manera amigable, atractiva y concisa (2-3 frases cortas) para alguien que está aprendiendo sobre este proyecto de software. No saludes, ve directo a la explicación. Concepto: "${missionContent}"`;
+    const persona = npcPersonas[npcName] || npcPersonas['default'];
+    const missionContent = mission.contenido_educativo;
+
+    const prompt = `Eres un personaje en un videojuego de CV interactivo. Tu nombre es ${npcName}.
+
+**Tu Personalidad:**
+${persona}
+
+**Contexto de la Misión Actual:**
+El jugador está trabajando en la misión llamada "${mission.titulo}". Tienes que explicarles el siguiente concepto clave de una manera que encaje con tu personalidad.
+
+**Concepto a Explicar:**
+"${missionContent}"
+
+**Tu Tarea:**
+Genera un diálogo corto y atractivo (2-3 frases).
+1. Empieza con un saludo personalizado y en personaje.
+2. Introduce y explica el concepto de forma natural y concisa.
+3. ¡Sé memorable!`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -15,7 +41,7 @@ export async function generateNpcDialogue(npcName: string, missionContent: strin
     return response.text;
   } catch (error) {
     console.error("Error generating dialogue:", error);
-    return `Hola, soy ${npcName}. He encontrado un error al procesar mi diálogo, pero la misión trata sobre: "${missionContent.substring(0, 80)}...". ¡Sigue adelante!`;
+    return `Hola, soy ${npcName}. He encontrado un error al procesar mi diálogo, pero la misión trata sobre: "${mission.contenido_educativo.substring(0, 80)}...". ¡Sigue adelante!`;
   }
 }
 
