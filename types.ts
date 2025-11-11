@@ -34,7 +34,7 @@ export interface ShopItem {
     description: string;
     cost: number;
     effect: {
-        type: 'SPEED_BOOST' | 'JUMP_JETS' | 'INTERACTION_RANGE_BOOST' | 'XP_BOOST';
+        type: 'SPEED_BOOST' | 'JUMP_JETS' | 'INTERACTION_RANGE_BOOST' | 'XP_BOOST' | 'TELEPORTER';
         value: number;
     }
 }

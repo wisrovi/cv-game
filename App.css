@@ -287,7 +287,24 @@ body {
 
 /* UI Styles */
 .top-bar { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 1180px; display: flex; justify-content: space-between; align-items: center; background: var(--ui-bg); padding: 5px 15px; border-radius: 10px; border: 1px solid var(--ui-border); z-index: 50; }
-.game-title { font-size: 1.2em; font-weight: bold; }
+.game-title { 
+    font-size: 1.2em; 
+    font-weight: bold;
+    transition: transform 0.2s ease-in-out, text-shadow 0.3s, color 0.3s;
+}
+.game-title.clicked {
+    transform: scale(1.05);
+    transition: transform 0.1s ease-in-out;
+}
+@keyframes title-glow {
+  0% { text-shadow: 0 0 4px rgba(0, 255, 170, 0.5); }
+  50% { text-shadow: 0 0 12px rgba(0, 255, 170, 1); }
+  100% { text-shadow: 0 0 4px rgba(0, 255, 170, 0.5); }
+}
+.game-title.activatable {
+  animation: title-glow 2.5s infinite ease-in-out;
+  color: var(--xp-color);
+}
 .top-bar-right { display: flex; align-items: center; gap: 20px; }
 .player-stats-top { display: flex; align-items: center; gap: 15px; }
 .player-level { background: var(--player-color-1); padding: 5px 10px; border-radius: 5px; }

@@ -1,0 +1,5 @@
+{
+  "name": "Wisrovi's Interactive CV",
+  "description": "An interactive CV presented as a game. Explore a city representing my projects, complete missions to learn about my skills, and level up your character. Features NPC dialogues powered by the Gemini API.",
+  "requestFramePermissions": []
+}

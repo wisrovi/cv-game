@@ -69,11 +69,17 @@ const App: React.FC = () => {
     const [showHud, setShowHud] = useState(true);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatMission, setChatMission] = useState<Mission | null>(null);
+    const [isDevMode, setIsDevMode] = useState(false);
+    const [titleClickCount, setTitleClickCount] = useState(0);
+    const [isTitleClicked, setIsTitleClicked] = useState(false);
+
 
     const keysPressed = useRef<{ [key: string]: boolean }>({});
     const gameLoopRef = useRef<number | null>(null);
     const lastTimeRef = useRef<number>(performance.now());
     const notificationTimeoutRef = useRef<number | null>(null);
+    const titleClickTimeoutRef = useRef<number | null>(null);
+
 
     const isGamePaused = dialogue || isShopOpen || isInventoryOpen || isMenuOpen || isChatOpen;
     const isPausedRef = useRef(isGamePaused);
@@ -250,6 +256,100 @@ const App: React.FC = () => {
         }
     };
     
+    const handleTitleClick = () => {
+        if (playerState.upgrades.includes('teleporter_module') && !isGamePaused) {
+            // Visual feedback
+            setIsTitleClicked(true);
+            setTimeout(() => setIsTitleClicked(false), 150);
+    
+            // Reset timer
+            if (titleClickTimeoutRef.current) {
+                clearTimeout(titleClickTimeoutRef.current);
+            }
+    
+            const newCount = titleClickCount + 1;
+            setTitleClickCount(newCount);
+    
+            if (newCount >= 7) {
+                if (!isDevMode) {
+                    setIsDevMode(true);
+                    showNotification("Modo desarrollador: Teletransporte activado (Tecla 'T')");
+                }
+                setTitleClickCount(0); // Reset on success
+            } else {
+                // Set a new timer to reset the count
+                titleClickTimeoutRef.current = window.setTimeout(() => {
+                    setTitleClickCount(0);
+                }, 2000); // 2 seconds to make the next click
+            }
+        }
+    };
+
+    const handleTeleport = useCallback(() => {
+        let missionToTarget = missions.find(m => m.status === 'disponible');
+        let missionPurpose = "objetivo de misión actual";
+
+        if (!missionToTarget) {
+            missionToTarget = missions.find(m => m.status === 'bloqueada');
+            missionPurpose = "inicio de la siguiente misión";
+        }
+
+        if (!missionToTarget) {
+            showNotification("¡Felicidades! Has completado todas las misiones.");
+            return;
+        }
+
+        const currentStep = missionToTarget.pasos[missionToTarget.paso_actual];
+        const targetId = currentStep.tipo === 'entregar' ? currentStep.zona : currentStep.objetoId;
+
+        if (!targetId) {
+            showNotification("El siguiente paso no tiene un objetivo físico.");
+            return;
+        }
+        const targetObject = gameObjects.find(obj => obj.id === targetId);
+
+        if (!targetObject) {
+            showNotification("No se pudo encontrar el objetivo de la misión.");
+            return;
+        }
+
+        const performTeleportToTarget = (target: GameObject) => {
+            const checkCollision = (x: number, y: number) => {
+                for (const obj of gameObjects) {
+                    if (obj.type === 'obstacle' || obj.type === 'building') {
+                        if (x < obj.x + obj.width && x + PLAYER_WIDTH > obj.x && y < obj.y + obj.height && y + PLAYER_HEIGHT > obj.y) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+
+            const landingSpots = [
+                { x: target.x + target.width / 2 - PLAYER_WIDTH / 2, y: target.y + target.height + 15 },
+                { x: target.x + target.width / 2 - PLAYER_WIDTH / 2, y: target.y - PLAYER_HEIGHT - 15 },
+                { x: target.x + target.width + 15, y: target.y + target.height / 2 - PLAYER_HEIGHT / 2 },
+                { x: target.x - PLAYER_WIDTH - 15, y: target.y + target.height / 2 - PLAYER_HEIGHT / 2 }
+            ];
+
+            for (const spot of landingSpots) {
+                const clampedX = Math.max(0, Math.min(spot.x, WORLD_WIDTH - PLAYER_WIDTH));
+                const clampedY = Math.max(0, Math.min(spot.y, WORLD_HEIGHT - PLAYER_HEIGHT));
+                if (!checkCollision(clampedX, clampedY)) {
+                    setPlayerState(prev => ({ ...prev, x: clampedX, y: clampedY }));
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if (performTeleportToTarget(targetObject)) {
+            showNotification(`Teletransportado a ${targetObject.name || 'objetivo'} (${missionPurpose}).`);
+        } else {
+            showNotification("No se pudo encontrar un punto de aterrizaje seguro cerca del objetivo.");
+        }
+    }, [missions, gameObjects, showNotification]);
+
     useEffect(() => {
         const gameLoop = (currentTime: number) => {
             const deltaTime = (currentTime - lastTimeRef.current) / 1000;
@@ -327,6 +427,11 @@ const App: React.FC = () => {
             if (e.key.toLowerCase() === 'e') {
                 e.preventDefault();
                 handleInteraction();
+            } else if (e.key.toLowerCase() === 't') {
+                if (isDevMode) {
+                    e.preventDefault();
+                    handleTeleport();
+                }
             } else if (e.key.toLowerCase() === 'i') {
                 setIsInventoryOpen(prev => !prev);
             } else if (e.key.toLowerCase() === 'h') {
@@ -352,8 +457,9 @@ const App: React.FC = () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
             if(notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
+            if(titleClickTimeoutRef.current) clearTimeout(titleClickTimeoutRef.current);
         };
-    }, [handleInteraction, dialogue, isShopOpen, isInventoryOpen, isMenuOpen, isChatOpen]);
+    }, [handleInteraction, dialogue, isShopOpen, isInventoryOpen, isMenuOpen, isChatOpen, isDevMode, handleTeleport]);
     
     const activeMission = missions.find(m => m.status === 'disponible');
     const xpToLevelUp = INITIAL_XP_TO_LEVEL_UP * Math.pow(1.5, playerState.level - 1);
@@ -430,7 +536,13 @@ const App: React.FC = () => {
             </div>
             
              <div className="top-bar">
-                <div className="game-title">Wisrovi's Interactive CV</div>
+                <div 
+                    className={`game-title ${playerState.upgrades.includes('teleporter_module') ? 'activatable' : ''} ${isTitleClicked ? 'clicked' : ''}`}
+                    onClick={handleTitleClick} 
+                    style={{cursor: playerState.upgrades.includes('teleporter_module') ? 'pointer' : 'default'}}
+                >
+                    Wisrovi's Interactive CV
+                </div>
                 <div className="top-bar-right">
                     <div className="player-stats-top">
                         <div className="player-level">Nv. {playerState.level}</div>
