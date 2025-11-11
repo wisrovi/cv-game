@@ -1,4 +1,4 @@
-import { Mission, GameObject, ShopItem } from './types';
+import { Mission, GameObject, ShopItem, Interior } from './types';
 
 export const PLAYER_INITIAL_SPEED = 180; // pixels per second
 export const PLAYER_INTERACTION_RANGE = 50;
@@ -21,16 +21,16 @@ export const gameObjects: GameObject[] = [
   { id: 'npc_vendor', x: 1300, y: 1250, width: 40, height: 50, type: 'npc', name: 'Vendedor de Mejoras', color: '#0072B2' },
 
   // Buildings (Projects)
-  { id: 'wiliutils_building', x: 200, y: 200, width: 250, height: 150, type: 'building', name: 'Campus Visión (wiliutils)', color: '#009E73' },
-  { id: 'wkafka_building', x: 800, y: 150, width: 220, height: 180, type: 'building', name: 'Taller Audio (wkafka)', color: '#0072B2' },
-  { id: 'wredis_building', x: 1400, y: 180, width: 200, height: 250, type: 'building', name: 'Redis Hub (wredis)', color: '#D55E00' },
-  { id: 'wcontainer_building', x: 2000, y: 550, width: 250, height: 180, type: 'building', name: 'Puerto GPU (wcontainer)', color: '#CC79A7' },
-  { id: 'facial_rec_building', x: 200, y: 600, width: 220, height: 180, type: 'building', name: 'Lab. Facial (facial_recognition)', color: '#F0E442' },
-  { id: 'wyolo_building', x: 800, y: 800, width: 280, height: 190, type: 'building', name: 'Centro YOLO (wyoloservice)', color: '#56B4E9' },
-  { id: 'wml_building', x: 1500, y: 950, width: 250, height: 250, type: 'building', name: 'Centro Datos (wml)', color: '#8B4513' },
-  { id: 'wapi_building', x: 2100, y: 1300, width: 200, height: 150, type: 'building', name: 'Mercado API (wapi)', color: '#607D8B' },
-  { id: 'wauth_building', x: 200, y: 1100, width: 200, height: 130, type: 'building', name: 'Fortaleza Auth (wauth)', color: '#444444' },
-  { id: 'wdeploy_building', x: 1400, y: 1400, width: 220, height: 140, type: 'building', name: 'Plataforma Deploy (wdeploy)', color: '#663399' },
+  { id: 'wiliutils_building', x: 200, y: 200, width: 250, height: 150, type: 'building', name: 'Campus Visión (wiliutils)', color: '#009E73', door: { x: 110, y: 120, width: 30, height: 30 } },
+  { id: 'wkafka_building', x: 800, y: 150, width: 220, height: 180, type: 'building', name: 'Taller Audio (wkafka)', color: '#0072B2', door: { x: 95, y: 150, width: 30, height: 30 } },
+  { id: 'wredis_building', x: 1400, y: 180, width: 200, height: 250, type: 'building', name: 'Redis Hub (wredis)', color: '#D55E00', door: { x: 85, y: 220, width: 30, height: 30 } },
+  { id: 'wcontainer_building', x: 2000, y: 550, width: 250, height: 180, type: 'building', name: 'Puerto GPU (wcontainer)', color: '#CC79A7', door: { x: 110, y: 150, width: 30, height: 30 } },
+  { id: 'facial_rec_building', x: 200, y: 600, width: 220, height: 180, type: 'building', name: 'Lab. Facial (facial_recognition)', color: '#F0E442', door: { x: 95, y: 150, width: 30, height: 30 } },
+  { id: 'wyolo_building', x: 800, y: 800, width: 280, height: 190, type: 'building', name: 'Centro YOLO (wyoloservice)', color: '#56B4E9', door: { x: 125, y: 160, width: 30, height: 30 } },
+  { id: 'wml_building', x: 1500, y: 950, width: 250, height: 250, type: 'building', name: 'Centro Datos (wml)', color: '#8B4513', door: { x: 110, y: 220, width: 30, height: 30 } },
+  { id: 'wapi_building', x: 2100, y: 1300, width: 200, height: 150, type: 'building', name: 'Mercado API (wapi)', color: '#607D8B', door: { x: 85, y: 120, width: 30, height: 30 } },
+  { id: 'wauth_building', x: 200, y: 1100, width: 200, height: 130, type: 'building', name: 'Fortaleza Auth (wauth)', color: '#444444', door: { x: 85, y: 100, width: 30, height: 30 } },
+  { id: 'wdeploy_building', x: 1400, y: 1400, width: 220, height: 140, type: 'building', name: 'Plataforma Deploy (wdeploy)', color: '#663399', door: { x: 95, y: 110, width: 30, height: 30 } },
   
   // Obstacles
   { id: 'rock1', x: 600, y: 600, width: 80, height: 80, type: 'obstacle', color: '#616161' },
@@ -230,4 +230,17 @@ export const shopItems: ShopItem[] = [
     { id: 'speed_boost_1', name: 'Aumento de Velocidad', description: 'Aumenta tu velocidad de movimiento en un 33%.', cost: 100, effect: { type: 'SPEED_BOOST', value: 1.33 } },
     { id: 'interaction_range_1', name: 'Escáner de Largo Alcance', description: 'Aumenta tu rango de interacción un 50%.', cost: 120, effect: { type: 'INTERACTION_RANGE_BOOST', value: 1.5 } },
     { id: 'xp_boost_1', name: 'Módulo de Aprendizaje', description: 'Gana un 20% más de XP permanentemente.', cost: 200, effect: { type: 'XP_BOOST', value: 1.2 } },
+];
+
+export const interiors: Interior[] = [
+    { id: 'wiliutils_interior', buildingId: 'wiliutils_building', name: 'Interior del Campus', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
+    { id: 'wkafka_interior', buildingId: 'wkafka_building', name: 'Interior del Taller', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
+    { id: 'wredis_interior', buildingId: 'wredis_building', name: 'Interior del Hub', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
+    { id: 'wcontainer_interior', buildingId: 'wcontainer_building', name: 'Interior del Puerto', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
+    { id: 'facial_rec_interior', buildingId: 'facial_rec_building', name: 'Interior del Laboratorio', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
+    { id: 'wyolo_interior', buildingId: 'wyolo_building', name: 'Interior del Centro YOLO', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
+    { id: 'wml_interior', buildingId: 'wml_building', name: 'Interior del Centro de Datos', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
+    { id: 'wapi_interior', buildingId: 'wapi_building', name: 'Interior del Mercado API', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
+    { id: 'wauth_interior', buildingId: 'wauth_building', name: 'Interior de la Fortaleza', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
+    { id: 'wdeploy_interior', buildingId: 'wdeploy_building', name: 'Interior de la Plataforma', width: 600, height: 400, exit: { x: 285, y: 350, width: 30, height: 50 } },
 ];

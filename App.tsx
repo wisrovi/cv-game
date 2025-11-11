@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { PlayerState, GameObject, Mission, Dialogue, ShopItem } from './types';
+import { PlayerState, GameObject, Mission, Dialogue, ShopItem, Interior } from './types';
 import {
   gameObjects as initialGameObjects,
   missions as initialMissions,
   shopItems,
+  interiors,
   PLAYER_INITIAL_SPEED,
   PLAYER_INTERACTION_RANGE,
   WORLD_WIDTH,
@@ -45,8 +46,8 @@ const MissionArrow: React.FC<MissionArrowProps> = ({ playerX, playerY, targetX, 
 
 const App: React.FC = () => {
     const [playerState, setPlayerState] = useState<PlayerState>({
-        x: WORLD_WIDTH / 2,
-        y: WORLD_HEIGHT / 2,
+        x: 1100,
+        y: 1450,
         level: 1,
         xp: 0,
         coins: 50,
@@ -70,12 +71,15 @@ const App: React.FC = () => {
     const [showHud, setShowHud] = useState(true);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [chatMission, setChatMission] = useState<Mission | null>(null);
+    const [currentInterior, setCurrentInterior] = useState<Interior | null>(null);
     
     // Developer Mode State
     const [devOptionsUnlocked, setDevOptionsUnlocked] = useState(false);
     const [teleporterEnabled, setTeleporterEnabled] = useState(false);
     const [versionClickCount, setVersionClickCount] = useState(0);
     const [isTeleporting, setIsTeleporting] = useState(false);
+    const [teleportPhase, setTeleportPhase] = useState<'idle' | 'out' | 'in'>('idle');
+
 
     const keysPressed = useRef<{ [key: string]: boolean }>({});
     const gameLoopRef = useRef<number | null>(null);
@@ -87,6 +91,14 @@ const App: React.FC = () => {
     const isGamePaused = dialogue || isShopOpen || isInventoryOpen || isMenuOpen || isChatOpen;
     const isPausedRef = useRef(isGamePaused);
     isPausedRef.current = isGamePaused;
+    
+    useEffect(() => {
+        // When the game is paused (e.g., a modal opens), clear any pressed keys
+        // to prevent the player from moving unexpectedly when the game resumes.
+        if (isGamePaused) {
+            keysPressed.current = {};
+        }
+    }, [isGamePaused]);
     
     const gameObjectsRef = useRef(gameObjects);
     gameObjectsRef.current = gameObjects;
@@ -195,6 +207,55 @@ const App: React.FC = () => {
         const target = playerState.interactionTarget;
         if (!target) return;
 
+        // --- Interior Logic ---
+        if (currentInterior) {
+            // Trying to exit
+            const exit = currentInterior.exit;
+            const dist = Math.hypot(
+                (exit.x + exit.width / 2) - (playerState.x + PLAYER_WIDTH / 2),
+                (exit.y + exit.height / 2) - (playerState.y + PLAYER_HEIGHT / 2)
+            );
+
+            if (dist < playerState.interactionRange) {
+                const building = gameObjects.find(b => b.id === currentInterior.buildingId);
+                if (building && building.door) {
+                    setPlayerState(prev => ({
+                        ...prev,
+                        x: building.x + building.door.x,
+                        y: building.y + building.door.y + building.door.height,
+                    }));
+                }
+                setCurrentInterior(null);
+            }
+            return;
+        }
+
+        // --- Exterior Logic ---
+        if (target.type === 'building' && target.door) {
+            const door = target.door;
+            const doorWorldX = target.x + door.x;
+            const doorWorldY = target.y + door.y;
+
+            const dist = Math.hypot(
+                (doorWorldX + door.width / 2) - (playerState.x + PLAYER_WIDTH / 2),
+                (doorWorldY + door.height / 2) - (playerState.y + PLAYER_HEIGHT / 2)
+            );
+
+            if (dist < playerState.interactionRange) {
+                const interior = interiors.find(i => i.buildingId === target.id);
+                if (interior) {
+                    setCurrentInterior(interior);
+                    setPlayerState(prev => ({
+                        ...prev,
+                        x: interior.exit.x,
+                        y: interior.exit.y + interior.exit.height,
+                        interactionTarget: null
+                    }));
+                }
+                return;
+            }
+        }
+
         if (target.id === 'npc_vendor') {
             setIsShopOpen(true);
             return;
@@ -246,7 +307,7 @@ const App: React.FC = () => {
         if (actionTaken) {
             advanceMissionStep(activeMission.id);
         }
-    }, [playerState, missions, dialogue, advanceMissionStep, showNotification]);
+    }, [playerState, missions, dialogue, advanceMissionStep, showNotification, currentInterior]);
 
     const buyShopItem = (item: ShopItem) => {
         if (playerState.coins >= item.cost && !playerState.upgrades.includes(item.id)) {
@@ -303,6 +364,11 @@ const App: React.FC = () => {
     };
 
     const handleTeleport = useCallback(() => {
+        if(currentInterior) {
+            showNotification("No se puede usar el teletransporte en interiores.");
+            return;
+        }
+
         let missionToTarget = missions.find(m => m.status === 'disponible');
         let missionPurpose = "objetivo de misión actual";
 
@@ -379,18 +445,25 @@ const App: React.FC = () => {
         const safeSpot = findSafeLandingSpot(targetObject);
 
         if (safeSpot) {
-            setIsTeleporting(true);
+            setTeleportPhase('out');
+            setTimeout(() => {
+                setIsTeleporting(true);
+            }, 200);
+
             setTimeout(() => {
                 setPlayerState(prev => ({ ...prev, x: safeSpot.x, y: safeSpot.y }));
+                setTeleportPhase('in');
                 showNotification(`Teletransportado a ${targetObject.name || 'objetivo'} (${missionPurpose}).`);
-            }, 500); // Teleport mid-animation
+            }, 500);
+
             setTimeout(() => {
                 setIsTeleporting(false);
-            }, 1000); // Animation ends
+                setTeleportPhase('idle');
+            }, 1000);
         } else {
             showNotification("No se pudo encontrar un punto de aterrizaje seguro cerca del objetivo.");
         }
-    }, [missions, gameObjects, showNotification]);
+    }, [missions, gameObjects, showNotification, currentInterior]);
 
     useEffect(() => {
         const gameLoop = (currentTime: number) => {
@@ -402,10 +475,10 @@ const App: React.FC = () => {
                     let dx = 0;
                     let dy = 0;
                     
-                    if (keysPressed.current['w'] || keysPressed.current['ArrowUp']) dy -= 1;
-                    if (keysPressed.current['s'] || keysPressed.current['ArrowDown']) dy += 1;
-                    if (keysPressed.current['a'] || keysPressed.current['ArrowLeft']) dx -= 1;
-                    if (keysPressed.current['d'] || keysPressed.current['ArrowRight']) dx += 1;
+                    if (keysPressed.current['w'] || keysPressed.current['arrowup']) dy -= 1;
+                    if (keysPressed.current['s'] || keysPressed.current['arrowdown']) dy += 1;
+                    if (keysPressed.current['a'] || keysPressed.current['arrowleft']) dx -= 1;
+                    if (keysPressed.current['d'] || keysPressed.current['arrowright']) dx += 1;
         
                     let newX = prev.x;
                     let newY = prev.y;
@@ -418,38 +491,54 @@ const App: React.FC = () => {
                         newX += moveX;
                         newY += moveY;
                     }
-        
-                    const checkCollision = (x: number, y: number) => {
+                    
+                    let closestTarget: GameObject | null = null;
+                    
+                    if (currentInterior) {
+                        newX = Math.max(0, Math.min(newX, currentInterior.width - PLAYER_WIDTH));
+                        newY = Math.max(0, Math.min(newY, currentInterior.height - PLAYER_HEIGHT));
+                        const exit = currentInterior.exit;
+                        const dist = Math.hypot((exit.x + exit.width / 2) - (newX + PLAYER_WIDTH / 2), (exit.y + exit.height / 2) - (newY + PLAYER_HEIGHT / 2));
+                        if(dist < prev.interactionRange) {
+                            closestTarget = { id: 'exit_door', name: 'Salir', type: 'object', ...exit };
+                        }
+                    } else {
+                        const checkCollision = (x: number, y: number) => {
+                            for (const obj of gameObjectsRef.current) {
+                                if (obj.type === 'obstacle' || obj.type === 'building') {
+                                    if (x < obj.x + obj.width && x + PLAYER_WIDTH > obj.x && y < obj.y + obj.height && y + PLAYER_HEIGHT > obj.y) {
+                                        return true;
+                                    }
+                                }
+                            }
+                            return false;
+                        };
+            
+                        if (checkCollision(newX, newY)) {
+                            if (!checkCollision(prev.x, newY)) newX = prev.x;
+                            else if (!checkCollision(newX, prev.y)) newY = prev.y;
+                            else { newX = prev.x; newY = prev.y; }
+                        }
+            
+                        newX = Math.max(0, Math.min(newX, WORLD_WIDTH - PLAYER_WIDTH));
+                        newY = Math.max(0, Math.min(newY, WORLD_HEIGHT - PLAYER_HEIGHT));
+                        
+                        let minDistance = Infinity;
                         for (const obj of gameObjectsRef.current) {
-                            if (obj.type === 'obstacle' || obj.type === 'building') {
-                                if (x < obj.x + obj.width && x + PLAYER_WIDTH > obj.x && y < obj.y + obj.height && y + PLAYER_HEIGHT > obj.y) {
-                                    return true;
+                            if (obj.type === 'npc' || obj.type === 'object' || obj.type === 'building') {
+                                const targetCenterX = obj.type === 'building' && obj.door ? obj.x + obj.door.x + obj.door.width / 2 : obj.x + obj.width / 2;
+                                const targetCenterY = obj.type === 'building' && obj.door ? obj.y + obj.door.y + obj.door.height / 2 : obj.y + obj.height / 2;
+                                
+                                const dist = Math.hypot(targetCenterX - (newX + PLAYER_WIDTH / 2), targetCenterY - (newY + PLAYER_HEIGHT / 2));
+                                
+                                if (dist < prev.interactionRange && dist < minDistance) {
+                                    minDistance = dist;
+                                    closestTarget = obj;
                                 }
                             }
                         }
-                        return false;
-                    };
-        
-                    if (checkCollision(newX, newY)) {
-                        if (!checkCollision(prev.x, newY)) newX = prev.x;
-                        else if (!checkCollision(newX, prev.y)) newY = prev.y;
-                        else { newX = prev.x; newY = prev.y; }
                     }
-        
-                    newX = Math.max(0, Math.min(newX, WORLD_WIDTH - PLAYER_WIDTH));
-                    newY = Math.max(0, Math.min(newY, WORLD_HEIGHT - PLAYER_HEIGHT));
                     
-                    let closestTarget: GameObject | null = null;
-                    let minDistance = Infinity;
-                    for (const obj of gameObjectsRef.current) {
-                        if (obj.type === 'npc' || obj.type === 'object') {
-                            const dist = Math.hypot((obj.x + obj.width / 2) - (newX + PLAYER_WIDTH / 2), (obj.y + obj.height / 2) - (newY + PLAYER_HEIGHT / 2));
-                            if (dist < prev.interactionRange && dist < minDistance) {
-                                minDistance = dist;
-                                closestTarget = obj;
-                            }
-                        }
-                    }
                     return { ...prev, x: newX, y: newY, interactionTarget: closestTarget };
                 });
             }
@@ -460,13 +549,13 @@ const App: React.FC = () => {
         return () => {
             if(gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
         };
-    }, []);
+    }, [currentInterior]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (isChatOpen) return;
             
-            if (e.key.toLowerCase() === 'e') {
+            if (e.key === ' ') {
                 e.preventDefault();
                 handleInteraction();
             } else if (e.key.toLowerCase() === 't') {
@@ -487,17 +576,25 @@ const App: React.FC = () => {
                 if (isInventoryOpen) setIsInventoryOpen(false);
                 if (isMenuOpen) { setIsMenuOpen(false); setMenuView('main'); }
             } else {
-                 keysPressed.current[e.key.toLowerCase()] = true;
+                const key = e.key.toLowerCase();
+                // Prevent default for movement keys to avoid scrolling the page
+                if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+                    e.preventDefault();
+                }
+                keysPressed.current[key] = true;
             }
         };
         const handleKeyUp = (e: KeyboardEvent) => { keysPressed.current[e.key.toLowerCase()] = false; };
+        const handleBlur = () => { keysPressed.current = {}; };
 
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('blur', handleBlur);
         
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('blur', handleBlur);
             if(notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
             if(versionClickTimeoutRef.current) clearTimeout(versionClickTimeoutRef.current);
         };
@@ -510,7 +607,7 @@ const App: React.FC = () => {
     const cameraY = Math.max(0, Math.min(playerState.y - VIEWPORT_HEIGHT / 2, WORLD_HEIGHT - VIEWPORT_HEIGHT));
 
     let missionTarget: GameObject | null = null;
-    if (activeMission) {
+    if (activeMission && !currentInterior) {
         const currentStep = activeMission.pasos[activeMission.paso_actual];
         if (currentStep) {
             const targetId = currentStep.tipo === 'entregar' ? currentStep.zona : currentStep.objetoId;
@@ -521,61 +618,83 @@ const App: React.FC = () => {
     }
     
     const playerLevelTier = Math.min(3, Math.floor(playerState.level / 5) + 1);
+    const playerClasses = `player player-level-${playerLevelTier} ${teleportPhase !== 'idle' ? `teleport-${teleportPhase}` : ''}`;
 
     return (
         <div className="app-container">
             {isTeleporting && <div className="teleport-overlay"></div>}
             <div className="game-viewport" style={{ width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT }}>
-                <div className="game-world" style={{ 
-                    width: WORLD_WIDTH, 
-                    height: WORLD_HEIGHT,
-                    transform: `translate(${-cameraX}px, ${-cameraY}px)`
-                }}>
-                    <div className="background-animated"></div>
-                    <div className="particles">
-                      {Array.from({ length: 50 }).map((_, i) => (
-                        <div key={i} className="particle" style={{
-                          left: `${Math.random() * 100}%`,
-                          top: `${Math.random() * 100}%`,
-                          animationDuration: `${25 + Math.random() * 25}s`,
-                          animationDelay: `${Math.random() * 20}s`,
-                        }}>
-                            <div className="particle-content" style={{ transform: `scale(${0.3 + Math.random() * 0.4})`}}>
-                                <div className="particle-body">
-                                    <div className="particle-head"></div>
+                {currentInterior ? (
+                    <div className="interior-view" style={{ width: currentInterior.width, height: currentInterior.height }}>
+                        <div className="interior-exit-door" style={{ left: currentInterior.exit.x, top: currentInterior.exit.y, width: currentInterior.exit.width, height: currentInterior.exit.height }}></div>
+                        <div className={playerClasses} style={{ left: playerState.x, top: playerState.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }}>
+                            <div className="player-body">
+                                <div className="player-cockpit"></div>
+                            </div>
+                            <div className="player-shadow"></div>
+                        </div>
+                        {playerState.interactionTarget && !isGamePaused && (
+                           <div className="interaction-prompt" style={{ left: playerState.interactionTarget.x, top: playerState.interactionTarget.y - 40, width: playerState.interactionTarget.width }}>
+                                <InteractIcon className="icon" /> [Espacio] {playerState.interactionTarget.name}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="game-world" style={{ 
+                        width: WORLD_WIDTH, 
+                        height: WORLD_HEIGHT,
+                        transform: `translate(${-cameraX}px, ${-cameraY}px)`
+                    }}>
+                        <div className="background-animated"></div>
+                        <div className="particles">
+                          {Array.from({ length: 50 }).map((_, i) => (
+                            <div key={i} className="particle" style={{
+                              left: `${Math.random() * 100}%`,
+                              top: `${Math.random() * 100}%`,
+                              animationDuration: `${25 + Math.random() * 25}s`,
+                              animationDelay: `${Math.random() * 20}s`,
+                            }}>
+                                <div className="particle-content" style={{ transform: `scale(${0.3 + Math.random() * 0.4})`}}>
+                                    <div className="particle-body">
+                                        <div className="particle-head"></div>
+                                    </div>
                                 </div>
                             </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                    
-                    {gameObjects.map(obj => (
-                        <div key={obj.id} id={obj.id} className={`game-object ${obj.type}`} style={{ left: obj.x, top: obj.y, width: obj.width, height: obj.height, backgroundColor: obj.type !== 'npc' ? obj.color : undefined }}>
-                           {(obj.type === 'npc') && (
-                                <>
-                                  <div className="npc-body">
-                                      <div className="npc-head"></div>
-                                  </div>
-                                </>
-                            )}
-                            {(obj.type === 'npc' || obj.type === 'building') && <span className="object-name">{obj.name}</span>}
-                        </div>
-                    ))}
+                        
+                        {gameObjects.map(obj => (
+                            <div key={obj.id} id={obj.id} className={`game-object ${obj.type}`} style={{ left: obj.x, top: obj.y, width: obj.width, height: obj.height, backgroundColor: obj.type !== 'npc' ? obj.color : undefined }}>
+                               {(obj.type === 'npc') && (
+                                    <>
+                                      <div className="npc-body">
+                                          <div className="npc-head"></div>
+                                      </div>
+                                    </>
+                                )}
+                                {obj.type === 'building' && obj.door && <div className="building-door" style={{ left: obj.door.x, top: obj.door.y, width: obj.door.width, height: obj.door.height }} />}
+                                {(obj.type === 'npc' || obj.type === 'building') && <span className="object-name">{obj.name}</span>}
+                            </div>
+                        ))}
 
-                    <div className={`player player-level-${playerLevelTier}`} style={{ left: playerState.x, top: playerState.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }}>
-                        <div className="player-body">
-                            <div className="player-cockpit"></div>
+                        <div className={playerClasses} style={{ left: playerState.x, top: playerState.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT }}>
+                            <div className="player-body">
+                                <div className="player-cockpit"></div>
+                            </div>
+                            <div className="player-shadow"></div>
                         </div>
-                        <div className="player-shadow"></div>
+                        
+                        {playerState.interactionTarget && !isGamePaused && (
+                             <div className="interaction-prompt" style={{
+                                left: playerState.interactionTarget.x + (playerState.interactionTarget.door?.x || 0),
+                                top: playerState.interactionTarget.y + (playerState.interactionTarget.door?.y || 0) - 40
+                            }}>
+                                <InteractIcon className="icon" /> [Espacio] {playerState.interactionTarget.type === 'building' ? 'Entrar' : playerState.interactionTarget.name}
+                            </div>
+                        )}
+                        <div className="vignette"></div>
                     </div>
-                    
-                    {playerState.interactionTarget && !isGamePaused && (
-                        <div className="interaction-prompt" style={{ left: playerState.interactionTarget.x, top: playerState.interactionTarget.y - 40, width: playerState.interactionTarget.width }}>
-                            <InteractIcon className="icon" /> [E] {playerState.interactionTarget.name}
-                        </div>
-                    )}
-                    <div className="vignette"></div>
-                </div>
+                )}
             </div>
             
              <div className="top-bar">
@@ -605,13 +724,6 @@ const App: React.FC = () => {
             
             <div className="ui-container">
                 <div className="hud-column left">
-                    {showHud && (
-                       <div className="hud-box">
-                            <h4>Controles</h4>
-                            <p className="controls-text"><b>WASD/Flechas:</b> Mover<br/><b>E:</b> Interactuar<br/><b>I:</b> Inventario / <b>M:</b> Misiones<br/><b>Esc:</b> Cerrar</p>
-                            <p className="controls-text hint">Pulsa <b>'H'</b> para minimizar la ayuda.</p>
-                        </div>
-                    )}
                     <MissionArrow 
                         playerX={playerState.x + PLAYER_WIDTH / 2}
                         playerY={playerState.y + PLAYER_HEIGHT / 2}
@@ -622,7 +734,7 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="hud-column right">
-                    {activeMission && (
+                    {activeMission && !currentInterior && (
                         <div className={`mission-tracker hud-box ${!showHud ? 'minimized' : ''}`}>
                             <h3>{activeMission.titulo}</h3>
                             <p>{activeMission.pasos[activeMission.paso_actual]?.descripcion || "¡Misión completada!"}</p>
@@ -630,13 +742,23 @@ const App: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {showHud && (
+               <div className="controls-overlay">
+                   <div className="hud-box">
+                        <h4>Controles</h4>
+                        <p className="controls-text"><b>WASD/Flechas:</b> Mover<br/><b>Espacio:</b> Interactuar<br/><b>I:</b> Inventario / <b>M:</b> Misiones<br/><b>Esc:</b> Cerrar</p>
+                        <p className="controls-text hint">Pulsa <b>'H'</b> para ocultar la ayuda.</p>
+                    </div>
+                </div>
+            )}
             
             {dialogue && (
                 <div className="dialogue-overlay" onClick={() => setDialogue(null)}>
                     <div className="dialogue-box">
                         <h3>{dialogue.npcName}</h3>
                         <p>{dialogue.text}</p>
-                        <small>Haz clic o pulsa 'E' / 'Esc' para cerrar</small>
+                        <small>Haz clic o pulsa 'Espacio' / 'Esc' para cerrar</small>
                     </div>
                 </div>
             )}

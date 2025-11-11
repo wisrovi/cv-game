@@ -8,6 +8,7 @@ export interface GameObject {
     name?: string;
     color?: string;
     missionId?: number;
+    door?: { x: number; y: number; width: number; height: number; };
 }
 
 export interface InventoryItem {
@@ -76,4 +77,13 @@ export interface ChatMessage {
     sender: 'user' | 'gemini';
     text: string;
     sources?: { uri: string; title: string }[];
+}
+
+export interface Interior {
+    id: string;
+    buildingId: string;
+    name: string;
+    width: number;
+    height: number;
+    exit: { x: number; y: number; width: number; height: number; };
 }

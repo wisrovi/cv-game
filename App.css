@@ -16,6 +16,8 @@
   --color-completed: #2ecc71;
   --color-available: #f1c40f;
   --color-locked: #555;
+  --interior-bg: #1a202c;
+  --interior-wall: #2d3748;
 }
 
 body {
@@ -36,16 +38,19 @@ body {
 
 .game-viewport {
   position: relative;
-  background-color: #1a1a1a;
   overflow: hidden;
   box-shadow: 0 0 30px rgba(0, 170, 255, 0.3);
   border: 2px solid var(--ui-border);
   border-radius: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .game-world {
   position: relative;
   transition: transform 0.2s linear;
+  background-color: #1a1a1a;
 }
 
 .background-animated {
@@ -127,7 +132,6 @@ body {
   justify-content: center;
   align-items: center;
   animation: player-float 3s ease-in-out infinite;
-  transition: all 0.5s ease-in-out;
 }
 
 .player-body {
@@ -221,6 +225,25 @@ body {
     box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
 }
 
+.building-door {
+  position: absolute;
+  background-color: #1a1a1a;
+  border: 2px solid #4a5568;
+  box-sizing: border-box;
+}
+.building-door::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 15%;
+  width: 4px;
+  height: 4px;
+  background: #a0aec0;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+
 /* Thematic Buildings */
 #wiliutils_building { background: #009E73; border-radius: 5px 20px 5px 5px;}
 #wiliutils_building::before { content: ''; position: absolute; top: 10px; left: 10px; right: 10px; height: 30%; background: rgba(255,255,255,0.1); border-radius: 3px; }
@@ -281,9 +304,36 @@ body {
 
 .object-name { position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: var(--ui-bg); padding: 2px 5px; border-radius: 3px; font-size: 10px; white-space: nowrap; border: 1px solid var(--ui-border); }
 
-.interaction-prompt { position: absolute; color: white; background: var(--ui-bg); border: 1px solid var(--ui-border); padding: 5px 10px; border-radius: 5px; z-index: 20; display: flex; align-items: center; gap: 5px; animation: prompt-pulse 2s infinite ease-in-out; }
+.interaction-prompt { position: absolute; color: white; background: var(--ui-bg); border: 1px solid var(--ui-border); padding: 5px 10px; border-radius: 5px; z-index: 20; display: flex; align-items: center; gap: 5px; animation: prompt-pulse 2s infinite ease-in-out; white-space: nowrap; }
 .interaction-prompt .icon { width: 16px; height: 16px; stroke: var(--xp-color); }
 @keyframes prompt-pulse { 0% { transform: scale(1); box-shadow: 0 0 5px var(--ui-border); } 50% { transform: scale(1.05); box-shadow: 0 0 15px var(--ui-border); } 100% { transform: scale(1); box-shadow: 0 0 5px var(--ui-border); } }
+
+/* --- Interior Styles --- */
+.interior-view {
+    position: relative;
+    background-color: var(--interior-bg);
+    border: 10px solid var(--interior-wall);
+    box-sizing: border-box;
+    background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+}
+
+.interior-exit-door {
+    position: absolute;
+    background-color: #4a5568;
+    border: 2px solid #a0aec0;
+}
+.interior-exit-door::after {
+    content: 'EXIT';
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #a0aec0;
+    font-size: 12px;
+}
 
 /* UI Styles */
 .top-bar { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 1180px; display: flex; justify-content: space-between; align-items: center; background: var(--ui-bg); padding: 5px 15px; border-radius: 10px; border: 1px solid var(--ui-border); z-index: 50; }
@@ -311,6 +361,18 @@ body {
 .controls-text { font-size: 0.8em; }
 .controls-text b { color: var(--xp-color); }
 .controls-text.hint { font-size: 0.7em; opacity: 0.8; margin-top: 10px; }
+
+.controls-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 150;
+}
+
+.controls-overlay .hud-box {
+    text-align: center;
+}
 
 .mission-tracker.minimized {
   transform: translateX(calc(100% - 40px));
@@ -493,6 +555,40 @@ body {
 }
 
 /* Teleport Effect */
+@keyframes teleport-out-effect {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  100% {
+    transform: scale(0.2);
+    opacity: 0;
+    filter: blur(10px);
+  }
+}
+
+@keyframes teleport-in-effect {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+    filter: blur(10px);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+.player.teleport-out {
+  animation: teleport-out-effect 0.3s ease-out forwards;
+}
+
+.player.teleport-in {
+  animation: teleport-in-effect 0.3s ease-in forwards;
+}
+
 .teleport-overlay {
     position: fixed;
     top: 0;
